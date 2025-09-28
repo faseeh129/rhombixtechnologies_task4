@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Futuristic Restaurant App</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: radial-gradient(circle at top, #0f2027, #203a43, #2c5364);
+      color: #fff;
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem 2rem;
+      background: rgba(0,0,0,0.6);
+      border-bottom: 2px solid #00f7ff;
+    }
+    header h1 {
+      font-size: 1.5rem;
+      color: #00f7ff;
+    }
+    .btn {
+      background: #00f7ff;
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      cursor: pointer;
+      color: #000;
+      font-weight: bold;
+      transition: 0.3s;
+    }
+    .btn:hover {
+      background: #00c4cc;
+    }
+    .menu {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+      gap: 1rem;
+      padding: 2rem;
+    }
+    .card {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid #00f7ff;
+      border-radius: 12px;
+      padding: 1rem;
+      text-align: center;
+    }
+    .card img {
+      width: 100%;
+      height: 180px;
+      object-fit: cover;
+      border-radius: 8px;
+      margin-bottom: 0.5rem;
+    }
+    .cart-btn {
+      position: fixed;
+      top: 1rem;
+      right: 1rem;
+      background: #00f7ff;
+      border: none;
+      border-radius: 50%;
+      width: 50px;
+      height: 50px;
+      cursor: pointer;
+      font-size: 1.5rem;
+      font-weight: bold;
+      color: #000;
+    }
+    .cart-panel {
+      position: fixed;
+      top: 0;
+      right: -400px;
+      width: 400px;
+      height: 100%;
+      background: #111;
+      border-left: 2px solid #00f7ff;
+      padding: 1rem;
+      overflow-y: auto;
+      transition: 0.4s;
+      z-index: 1000;
+    }
+    .cart-panel.active {
+      right: 0;
+    }
+    .cart-item {
+      display: flex;
+      align-items: center;
+      margin-bottom: 1rem;
+      border-bottom: 1px solid #333;
+      padding-bottom: 0.5rem;
+    }
+    .cart-item img {
+      width: 50px;
+      height: 50px;
+      border-radius: 6px;
+      margin-right: 0.5rem;
+    }
+    .admin-panel {
+      display: none;
+      padding: 1rem;
+      border-top: 2px solid #00f7ff;
+      background: rgba(0,0,0,0.7);
+    }
+    .admin-panel.active {
+      display: block;
+    }
+    .preview {
+      margin-top: 0.5rem;
+      max-height: 100px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Futuristic Restaurant</h1>
+    <div>
+      <button class="btn" id="adminToggle">Admin Dashboard</button>
+    </div>
+  </header>
+
+  <button class="cart-btn" id="cartBtn">🛒</button>
+  <div class="cart-panel" id="cartPanel">
+    <h2>Your Cart</h2>
+    <div id="cartItems"></div>
+    <p><strong>Total: $<span id="cartTotal">0</span></strong></p>
+    <button class="btn" id="checkoutBtn">Place Order</button>
+  </div>
+
+  <main>
+    <div class="menu" id="menu"></div>
+  </main>
+
+  <div class="admin-panel" id="adminPanel">
+    <h2>Add Menu Item</h2>
+    <form id="adminForm">
+      <input type="text" id="itemName" placeholder="Dish Name" required><br><br>
+      <textarea id="itemDesc" placeholder="Description" required></textarea><br><br>
+      <input type="number" id="itemPrice" placeholder="Price" required><br><br>
+      <input type="file" id="itemImage" accept="image/*" required><br>
+      <img id="preview" class="preview" style="display:none;"/>
+      <br><br>
+      <button type="submit" class="btn">Add Item</button>
+    </form>
+  </div>
+
+  <script>
+    const menuEl = document.getElementById('menu');
+    const adminToggle = document.getElementById('adminToggle');
+    const adminPanel = document.getElementById('adminPanel');
+    const adminForm = document.getElementById('adminForm');
+    const preview = document.getElementById('preview');
+    const cartBtn = document.getElementById('cartBtn');
+    const cartPanel = document.getElementById('cartPanel');
+    const cartItemsEl = document.getElementById('cartItems');
+    const cartTotalEl = document.getElementById('cartTotal');
+
+    let menuItems = JSON.parse(localStorage.getItem('menuItems')) || [];
+    let cart = JSON.parse(localStorage.getItem('cart')) || [];
+
+    function renderMenu() {
+      menuEl.innerHTML = '';
+      menuItems.forEach((item, index) => {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.innerHTML = `
+          <img src="${item.img}" alt="${item.name}">
+          <h3>${item.name}</h3>
+          <p>${item.desc}</p>
+          <p><strong>$${item.price}</strong></p>
+          <button class="btn" onclick="addToCart(${index})">Add to Cart</button>
+        `;
+        menuEl.appendChild(card);
+      });
+    }
+
+    function renderCart() {
+      cartItemsEl.innerHTML = '';
+      let total = 0;
+      cart.forEach((item, index) => {
+        total += item.price * item.qty;
+        const cartItem = document.createElement('div');
+        cartItem.className = 'cart-item';
+        cartItem.innerHTML = `
+          <img src="${item.img}" alt="${item.name}">
+          <div>
+            <p>${item.name} ($${item.price})</p>
+            <p>Qty: <button onclick="updateQty(${index}, -1)">-</button> ${item.qty} <button onclick="updateQty(${index}, 1)">+</button></p>
+            <button class="btn" onclick="removeFromCart(${index})">Remove</button>
+          </div>
+        `;
+        cartItemsEl.appendChild(cartItem);
+      });
+      cartTotalEl.textContent = total.toFixed(2);
+      localStorage.setItem('cart', JSON.stringify(cart));
+    }
+
+    function addToCart(index) {
+      const item = menuItems[index];
+      const existing = cart.find(c => c.name === item.name);
+      if (existing) {
+        existing.qty++;
+      } else {
+        cart.push({...item, qty: 1});
+      }
+      renderCart();
+    }
+
+    function updateQty(index, change) {
+      cart[index].qty += change;
+      if (cart[index].qty <= 0) cart.splice(index, 1);
+      renderCart();
+    }
+
+    function removeFromCart(index) {
+      cart.splice(index, 1);
+      renderCart();
+    }
+
+    adminToggle.addEventListener('click', () => {
+      adminPanel.classList.toggle('active');
+    });
+
+    cartBtn.addEventListener('click', () => {
+      cartPanel.classList.toggle('active');
+    });
+
+    document.getElementById('itemImage').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = () => {
+          preview.src = reader.result;
+          preview.style.display = 'block';
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+
+    adminForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const name = document.getElementById('itemName').value;
+      const desc = document.getElementById('itemDesc').value;
+      const price = parseFloat(document.getElementById('itemPrice').value);
+      const img = preview.src;
+      menuItems.push({name, desc, price, img});
+      localStorage.setItem('menuItems', JSON.stringify(menuItems));
+      adminForm.reset();
+      preview.style.display = 'none';
+      renderMenu();
+    });
+
+    document.getElementById('checkoutBtn').addEventListener('click', () => {
+      alert('✅ Order placed successfully!');
+      cart = [];
+      localStorage.removeItem('cart');
+      renderCart();
+    });
+
+    renderMenu();
+    renderCart();
+  </script>
+</body>
+</html>
